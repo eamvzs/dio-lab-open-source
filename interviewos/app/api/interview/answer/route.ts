@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { geminiModel, buildInterviewSystemPrompt } from "@/lib/gemini";
+import { getMockNextQuestion } from "@/lib/gemini-mock";
+
+const isDemo =
+  !process.env.GEMINI_API_KEY ||
+  process.env.GEMINI_API_KEY === "your-gemini-api-key";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -15,7 +20,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 });
   }
 
-  // Load session
   const interviewSession = await prisma.interviewSession.findUnique({
     where: { id: sessionId, userId: session.user.id },
     include: { messages: { orderBy: { createdAt: "asc" } } },
@@ -29,71 +33,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Entrevista encerrada" }, { status: 400 });
   }
 
-  // Save candidate answer
   await prisma.message.create({
-    data: {
-      sessionId,
-      role: "candidate",
-      content: answer.trim(),
-    },
+    data: { sessionId, role: "candidate", content: answer.trim() },
   });
 
-  // Rebuild chat history for Gemini
-  const systemPrompt = buildInterviewSystemPrompt(
-    interviewSession.role,
-    interviewSession.level,
-    interviewSession.companyType
-  );
+  let interviewerResponse: string;
+  let isEnding = false;
 
-  // Build history: all messages except the last (which we just added)
-  const history = interviewSession.messages.map((msg) => ({
-    role: msg.role === "interviewer" ? ("model" as const) : ("user" as const),
-    parts: [{ text: msg.content }],
-  }));
+  if (isDemo) {
+    // Count how many questions were asked so far (excluding opener)
+    const questionCount = interviewSession.messages.filter(
+      (m) => m.role === "interviewer"
+    ).length - 1;
 
-  // Add system trigger (first message from model was the opener)
-  const fullHistory = [
-    {
-      role: "user" as const,
-      parts: [{ text: "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento." }],
-    },
-    ...history,
-    {
-      role: "user" as const,
-      parts: [{ text: answer.trim() }],
-    },
-  ];
+    const result = getMockNextQuestion(interviewSession.role, questionCount, answer.trim());
+    interviewerResponse = result.message;
+    isEnding = result.isEnding;
+  } else {
+    const systemPrompt = buildInterviewSystemPrompt(
+      interviewSession.role,
+      interviewSession.level,
+      interviewSession.companyType
+    );
 
-  const chat = geminiModel.startChat({
-    history: fullHistory.slice(0, -1), // all but last
-    systemInstruction: systemPrompt,
-  });
+    const history = interviewSession.messages.map((msg) => ({
+      role: msg.role === "interviewer" ? ("model" as const) : ("user" as const),
+      parts: [{ text: msg.content }],
+    }));
 
-  const result = await chat.sendMessage(answer.trim());
-  const interviewerResponse = result.response.text();
+    const fullHistory = [
+      {
+        role: "user" as const,
+        parts: [{ text: "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento." }],
+      },
+      ...history,
+    ];
 
-  // Save interviewer response
+    const chat = geminiModel.startChat({
+      history: fullHistory.slice(0, -1),
+      systemInstruction: systemPrompt,
+    });
+
+    const result = await chat.sendMessage(answer.trim());
+    interviewerResponse = result.response.text();
+
+    const endingSignals = [
+      "encerramos", "encerrar a entrevista", "feedback estará disponível",
+      "obrigado pela sua participação", "boa sorte", "foi um prazer", "até logo",
+    ];
+    isEnding = endingSignals.some((s) => interviewerResponse.toLowerCase().includes(s));
+  }
+
   await prisma.message.create({
-    data: {
-      sessionId,
-      role: "interviewer",
-      content: interviewerResponse,
-    },
+    data: { sessionId, role: "interviewer", content: interviewerResponse },
   });
-
-  // Check if interview is ending (heuristic: look for farewell signals)
-  const endingSignals = [
-    "encerramos",
-    "encerrar a entrevista",
-    "feedback estará disponível",
-    "obrigado pela sua participação",
-    "boa sorte",
-    "foi um prazer",
-    "até logo",
-  ];
-  const isEnding = endingSignals.some((signal) =>
-    interviewerResponse.toLowerCase().includes(signal)
-  );
 
   if (isEnding) {
     await prisma.interviewSession.update({
@@ -102,8 +95,5 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({
-    message: interviewerResponse,
-    isEnding,
-  });
+  return NextResponse.json({ message: interviewerResponse, isEnding });
 }

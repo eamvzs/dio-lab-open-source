@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { geminiModel, buildFeedbackPrompt } from "@/lib/gemini";
+import { getMockFeedback } from "@/lib/gemini-mock";
+
+const isDemo =
+  !process.env.GEMINI_API_KEY ||
+  process.env.GEMINI_API_KEY === "your-gemini-api-key";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -28,60 +33,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ feedback: JSON.parse(interviewSession.feedback!) });
   }
 
-  // Generate feedback with Gemini
-  const feedbackPrompt = buildFeedbackPrompt(
-    interviewSession.role,
-    interviewSession.level,
-    interviewSession.companyType,
-    interviewSession.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }))
-  );
+  let feedback: object;
 
-  const result = await geminiModel.generateContent(feedbackPrompt);
-  let feedbackText = result.response.text();
+  if (isDemo) {
+    feedback = getMockFeedback(interviewSession.role);
+  } else {
+    const feedbackPrompt = buildFeedbackPrompt(
+      interviewSession.role,
+      interviewSession.level,
+      interviewSession.companyType,
+      interviewSession.messages.map((m) => ({ role: m.role, content: m.content }))
+    );
 
-  // Clean potential markdown code blocks
-  feedbackText = feedbackText
-    .replace(/```json\n?/g, "")
-    .replace(/```\n?/g, "")
-    .trim();
+    const result = await geminiModel.generateContent(feedbackPrompt);
+    let feedbackText = result.response.text()
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
 
-  let feedback;
-  try {
-    feedback = JSON.parse(feedbackText);
-  } catch {
-    // Fallback feedback if JSON parsing fails
-    feedback = {
-      score: 60,
-      summary: "Entrevista concluída. Não foi possível gerar feedback detalhado automaticamente.",
-      strengths: ["Participou da entrevista até o fim", "Demonstrou interesse na vaga"],
-      improvements: [
-        {
-          area: "Revisão manual",
-          description: "O feedback automático não pôde ser gerado.",
-          suggestion: "Revise suas respostas e identifique pontos a melhorar.",
-        },
-      ],
-      studyPlan: [
-        {
-          topic: "Fundamentos da área",
-          priority: "alta",
-          resources: ["MDN Web Docs", "Documentação oficial"],
-        },
-      ],
-      verdict: "em_desenvolvimento",
-      verdictMessage: "Continue praticando para melhorar seus resultados.",
-    };
+    try {
+      feedback = JSON.parse(feedbackText);
+    } catch {
+      feedback = getMockFeedback(interviewSession.role, 60);
+    }
   }
 
-  // Save feedback and mark as completed
+  const feedbackData = feedback as { score: number };
+
   await prisma.interviewSession.update({
     where: { id: sessionId },
     data: {
       status: "completed",
-      score: feedback.score,
+      score: feedbackData.score,
       feedback: JSON.stringify(feedback),
       endedAt: new Date(),
     },
