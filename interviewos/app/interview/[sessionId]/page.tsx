@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Terminal, Send, Loader2, StopCircle, AlertCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ROLE_LABELS, COMPANY_LABELS, LEVEL_LABELS } from "@/lib/gemini";
@@ -63,6 +64,7 @@ function ChatMessage({ message }: { message: MessageType }) {
       >
         {isInterviewer ? (
           <ReactMarkdown
+            rehypePlugins={[rehypeSanitize]}
             components={{
               code: ({ children }) => (
                 <code className="bg-muted/50 px-1.5 py-0.5 rounded text-xs font-mono text-primary">

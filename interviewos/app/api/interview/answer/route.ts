@@ -8,6 +8,8 @@ const isDemo =
   !process.env.GEMINI_API_KEY ||
   process.env.GEMINI_API_KEY === "your-gemini-api-key";
 
+const MAX_ANSWER_LENGTH = 4000;
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -16,10 +18,19 @@ export async function POST(req: NextRequest) {
 
   const { sessionId, answer } = await req.json();
 
-  if (!sessionId || !answer?.trim()) {
+  if (
+    !sessionId ||
+    typeof sessionId !== "string" ||
+    !answer?.trim() ||
+    typeof answer !== "string"
+  ) {
     return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 });
   }
 
+  // FIX: limita tamanho da resposta para evitar payload abuse
+  const sanitizedAnswer = answer.trim().slice(0, MAX_ANSWER_LENGTH);
+
+  // Valida que a sessão pertence ao usuário autenticado
   const interviewSession = await prisma.interviewSession.findUnique({
     where: { id: sessionId, userId: session.user.id },
     include: { messages: { orderBy: { createdAt: "asc" } } },
@@ -34,19 +45,16 @@ export async function POST(req: NextRequest) {
   }
 
   await prisma.message.create({
-    data: { sessionId, role: "candidate", content: answer.trim() },
+    data: { sessionId, role: "candidate", content: sanitizedAnswer },
   });
 
   let interviewerResponse: string;
   let isEnding = false;
 
   if (isDemo) {
-    // Count how many questions were asked so far (excluding opener)
-    const questionCount = interviewSession.messages.filter(
-      (m) => m.role === "interviewer"
-    ).length - 1;
-
-    const result = getMockNextQuestion(interviewSession.role, questionCount, answer.trim());
+    const questionCount =
+      interviewSession.messages.filter((m) => m.role === "interviewer").length - 1;
+    const result = getMockNextQuestion(interviewSession.role, questionCount, sanitizedAnswer);
     interviewerResponse = result.message;
     isEnding = result.isEnding;
   } else {
@@ -74,7 +82,7 @@ export async function POST(req: NextRequest) {
       systemInstruction: systemPrompt,
     });
 
-    const result = await chat.sendMessage(answer.trim());
+    const result = await chat.sendMessage(sanitizedAnswer);
     interviewerResponse = result.response.text();
 
     const endingSignals = [
@@ -90,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   if (isEnding) {
     await prisma.interviewSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, userId: session.user.id },
       data: { status: "completing" },
     });
   }

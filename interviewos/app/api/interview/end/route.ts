@@ -8,6 +8,31 @@ const isDemo =
   !process.env.GEMINI_API_KEY ||
   process.env.GEMINI_API_KEY === "your-gemini-api-key";
 
+function isValidFeedback(obj: unknown): obj is {
+  score: number;
+  summary: string;
+  strengths: string[];
+  improvements: unknown[];
+  studyPlan: unknown[];
+  verdict: string;
+  verdictMessage: string;
+} {
+  if (!obj || typeof obj !== "object") return false;
+  const f = obj as Record<string, unknown>;
+  return (
+    typeof f.score === "number" &&
+    f.score >= 0 &&
+    f.score <= 100 &&
+    typeof f.summary === "string" &&
+    Array.isArray(f.strengths) &&
+    Array.isArray(f.improvements) &&
+    Array.isArray(f.studyPlan) &&
+    typeof f.verdict === "string" &&
+    ["aprovado", "em_desenvolvimento", "precisa_evoluir"].includes(f.verdict) &&
+    typeof f.verdictMessage === "string"
+  );
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -16,10 +41,11 @@ export async function POST(req: NextRequest) {
 
   const { sessionId } = await req.json();
 
-  if (!sessionId) {
+  if (!sessionId || typeof sessionId !== "string") {
     return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 });
   }
 
+  // FIX CRÍTICO: filtra por userId para impedir acesso cruzado entre usuários
   const interviewSession = await prisma.interviewSession.findUnique({
     where: { id: sessionId, userId: session.user.id },
     include: { messages: { orderBy: { createdAt: "asc" } } },
@@ -30,10 +56,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (interviewSession.status === "completed") {
-    return NextResponse.json({ feedback: JSON.parse(interviewSession.feedback!) });
+    try {
+      const stored = JSON.parse(interviewSession.feedback!);
+      if (!isValidFeedback(stored)) throw new Error("Estrutura inválida");
+      return NextResponse.json({ feedback: stored });
+    } catch {
+      // Se feedback armazenado for inválido, regenera
+    }
   }
 
-  let feedback: object;
+  let feedback: unknown;
 
   if (isDemo) {
     feedback = getMockFeedback(interviewSession.role);
@@ -46,25 +78,30 @@ export async function POST(req: NextRequest) {
     );
 
     const result = await geminiModel.generateContent(feedbackPrompt);
-    let feedbackText = result.response.text()
+    const feedbackText = result.response
+      .text()
       .replace(/```json\n?/g, "")
       .replace(/```\n?/g, "")
       .trim();
 
     try {
-      feedback = JSON.parse(feedbackText);
+      const parsed = JSON.parse(feedbackText);
+      feedback = isValidFeedback(parsed) ? parsed : getMockFeedback(interviewSession.role, 60);
     } catch {
       feedback = getMockFeedback(interviewSession.role, 60);
     }
   }
 
-  const feedbackData = feedback as { score: number };
+  if (!isValidFeedback(feedback)) {
+    return NextResponse.json({ error: "Erro ao gerar feedback" }, { status: 500 });
+  }
 
+  // FIX CRÍTICO: inclui userId no update para garantir que só o dono pode atualizar
   await prisma.interviewSession.update({
-    where: { id: sessionId },
+    where: { id: sessionId, userId: session.user.id },
     data: {
       status: "completed",
-      score: feedbackData.score,
+      score: feedback.score,
       feedback: JSON.stringify(feedback),
       endedAt: new Date(),
     },

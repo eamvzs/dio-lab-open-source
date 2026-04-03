@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { geminiModel, buildInterviewSystemPrompt } from "@/lib/gemini";
+import { geminiModel, buildInterviewSystemPrompt, ROLE_LABELS, LEVEL_LABELS, COMPANY_LABELS } from "@/lib/gemini";
 import { getMockOpener } from "@/lib/gemini-mock";
 
 const isDemo =
   !process.env.GEMINI_API_KEY ||
   process.env.GEMINI_API_KEY === "your-gemini-api-key";
+
+// Whitelist explícita de valores aceitos
+const VALID_ROLES = Object.keys(ROLE_LABELS);
+const VALID_LEVELS = Object.keys(LEVEL_LABELS);
+const VALID_COMPANIES = Object.keys(COMPANY_LABELS);
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -17,7 +22,12 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { role, level, companyType } = body;
 
-  if (!role || !level || !companyType) {
+  // FIX ALTA: whitelist — rejeita qualquer valor fora do conjunto esperado
+  if (
+    !VALID_ROLES.includes(role) ||
+    !VALID_LEVELS.includes(level) ||
+    !VALID_COMPANIES.includes(companyType)
+  ) {
     return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 });
   }
 
