@@ -9,7 +9,9 @@ export function middleware(req: NextRequest) {
   if (isProtected) {
     // Check for session token (NextAuth sets this cookie)
     const sessionToken =
+      req.cookies.get("authjs.session-token") ||
       req.cookies.get("next-auth.session-token") ||
+      req.cookies.get("__Secure-authjs.session-token") ||
       req.cookies.get("__Secure-next-auth.session-token");
 
     if (!sessionToken) {
