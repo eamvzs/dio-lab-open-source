@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
       const chat = geminiModel.startChat({
         history: fullHistory.slice(0, -1),
-        systemInstruction: systemPrompt,
+        systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
       });
 
       const result = await chat.sendMessage(sanitizedAnswer);

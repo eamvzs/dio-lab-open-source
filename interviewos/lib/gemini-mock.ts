@@ -86,13 +86,14 @@ export function getMockNextQuestion(
   lastAnswer: string
 ): { message: string; isEnding: boolean } {
   const questions = QUESTION_POOL[role] || QUESTION_POOL["frontend-jr"];
+  const safeIndex = Math.max(0, questionIndex);
 
-  if (questionIndex >= questions.length) {
+  if (safeIndex >= questions.length) {
     return { message: ENDINGS[0], isEnding: true };
   }
 
   const reaction = REACTIONS[Math.floor(Math.random() * REACTIONS.length)];
-  const nextQuestion = questions[questionIndex];
+  const nextQuestion = questions[safeIndex];
 
   return {
     message: reaction + nextQuestion,
