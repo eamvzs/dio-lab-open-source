@@ -42,12 +42,10 @@ export async function POST(req: NextRequest) {
   } else {
     try {
       const systemPrompt = buildInterviewSystemPrompt(role, level, companyType);
-      const chat = geminiModel.startChat({
-        history: [],
-        systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
-      });
-      const result = await chat.sendMessage(
-        "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento."
+      // Embute o system prompt como primeira mensagem — compatível com todas as versões do SDK
+      const result = await geminiModel.generateContent(
+        systemPrompt +
+        "\n\n---\n\nAgora inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento. Responda diretamente como o entrevistador, sem comentários extras."
       );
       firstMessage = result.response.text();
     } catch (err) {

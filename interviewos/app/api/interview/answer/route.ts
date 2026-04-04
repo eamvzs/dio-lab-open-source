@@ -70,17 +70,17 @@ export async function POST(req: NextRequest) {
         parts: [{ text: msg.content }],
       }));
 
+      // Embute system prompt no início do histórico — sem systemInstruction
       const fullHistory = [
         {
           role: "user" as const,
-          parts: [{ text: "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento." }],
+          parts: [{ text: systemPrompt + "\n\n---\n\nInicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento." }],
         },
         ...history,
       ];
 
       const chat = geminiModel.startChat({
         history: fullHistory.slice(0, -1),
-        systemInstruction: { role: "user", parts: [{ text: systemPrompt }] },
       });
 
       const result = await chat.sendMessage(sanitizedAnswer);
