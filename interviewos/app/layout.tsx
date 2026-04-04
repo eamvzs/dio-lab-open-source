@@ -31,12 +31,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark">
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="InterviewOS" />
-      </head>
       <body style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>{children}</body>
     </html>
   );
