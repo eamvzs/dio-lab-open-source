@@ -76,7 +76,7 @@ export default async function LandingPage() {
           <nav className="flex items-center gap-3">
             {session ? (
               <Button asChild size="sm">
-                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/dashboard">Métricas</Link>
               </Button>
             ) : (
               <>

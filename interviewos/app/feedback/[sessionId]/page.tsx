@@ -84,7 +84,7 @@ export default function FeedbackPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <p className="text-destructive">{error}</p>
-          <Button asChild><Link href="/dashboard">Ir para o Dashboard</Link></Button>
+          <Button asChild><Link href="/dashboard">Ir para Métricas</Link></Button>
         </div>
       </div>
     );
