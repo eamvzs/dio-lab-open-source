@@ -26,6 +26,67 @@ import { FeedbackData } from "@/types";
 import { ROLE_LABELS, COMPANY_LABELS } from "@/lib/gemini";
 import { cn, getScoreColor, getScoreBg, getVerdictLabel, getVerdictColor } from "@/lib/utils";
 
+function Confetti() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = ["#7c3aed", "#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#a855f7", "#ec4899"];
+    const pieces = Array.from({ length: 140 }, () => ({
+      x: Math.random() * canvas.width,
+      y: -20 - Math.random() * 100,
+      vx: (Math.random() - 0.5) * 5,
+      vy: Math.random() * 3 + 2,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      vr: (Math.random() - 0.5) * 10,
+      size: Math.random() * 9 + 4,
+      shape: Math.random() > 0.5 ? "rect" : "circle",
+    }));
+
+    let frame: number;
+    let active = true;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      pieces.forEach((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.08;
+        p.rotation += p.vr;
+        const alpha = Math.max(0, 1 - p.y / (canvas.height * 1.1));
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = alpha;
+        if (p.shape === "circle") {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        }
+        ctx.restore();
+      });
+      if (active) frame = requestAnimationFrame(draw);
+    };
+
+    frame = requestAnimationFrame(draw);
+    const t = setTimeout(() => { active = false; }, 4500);
+    return () => { active = false; cancelAnimationFrame(frame); clearTimeout(t); };
+  }, []);
+
+  return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-50" style={{ width: "100vw", height: "100vh" }} />;
+}
+
 const priorityColors: Record<string, string> = {
   alta: "text-red-400 bg-red-500/10 border-red-500/20",
   média: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
@@ -184,6 +245,7 @@ export default function FeedbackPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {feedback && feedback.score >= 75 && <Confetti />}
       {/* Header */}
       <header className="border-b border-border/40">
         <div className="container flex h-14 items-center justify-between">
