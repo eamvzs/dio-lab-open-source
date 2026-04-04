@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "prisma generate --schema=prisma/schema.dev.prisma && next dev",
+    "dev": "next dev",
     "build": "prisma generate && prisma db push && next build",
     "start": "next start",
     "lint": "next lint",
-    "setup:dev": "prisma db push --schema=prisma/schema.dev.prisma",
+    "setup:dev": "prisma generate --schema=prisma/schema.dev.prisma && prisma db push --schema=prisma/schema.dev.prisma",
     "db:push": "prisma db push",
     "db:studio": "prisma studio --schema=prisma/schema.dev.prisma"
   },
