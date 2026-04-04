@@ -64,7 +64,14 @@ export default function SetupPage() {
         throw new Error(err.error || "Erro ao iniciar entrevista");
       }
 
-      const { sessionId } = await res.json();
+      const { sessionId, message } = await res.json();
+      // Guarda mensagem inicial no sessionStorage como fallback de carregamento rápido
+      if (message) {
+        sessionStorage.setItem(
+          `interview_${sessionId}`,
+          JSON.stringify({ message, role: selectedRole, level: selectedLevel, companyType: selectedCompany })
+        );
+      }
       router.push(`/interview/${sessionId}`);
     } catch (error) {
       console.error(error);

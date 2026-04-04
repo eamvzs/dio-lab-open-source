@@ -105,6 +105,7 @@ export default function InterviewPage() {
   const [error, setError] = useState("");
   const [questionCount, setQuestionCount] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isGeminiActive, setIsGeminiActive] = useState(false);
   const startTimeRef = useRef<number>(Date.now());
 
   const scrollToBottom = useCallback(() => {
@@ -133,23 +134,26 @@ export default function InterviewPage() {
   useEffect(() => {
     const loadSession = async () => {
       try {
+        // Usa sessionStorage como fallback imediato enquanto a API carrega
+        const storedMsg = sessionStorage.getItem(`interview_${sessionId}`);
+        if (storedMsg) {
+          const { message, role, level, companyType } = JSON.parse(storedMsg);
+          setMessages([{ id: "init", role: "interviewer", content: message, createdAt: new Date() }]);
+          setSessionMeta({ role, level, companyType });
+          sessionStorage.removeItem(`interview_${sessionId}`);
+        }
+
         const res = await fetch(`/api/interview/session/${sessionId}`);
         if (res.ok) {
           const data = await res.json();
-          setMessages(data.messages);
+          if (data.messages?.length > 0) setMessages(data.messages);
           setSessionMeta({ role: data.role, level: data.level, companyType: data.companyType });
           setQuestionCount(data.messages.filter((m: MessageType) => m.role === "interviewer").length - 1);
-        } else {
-          // Try to get first message from local storage
-          const storedMsg = sessionStorage.getItem(`interview_${sessionId}`);
-          if (storedMsg) {
-            const { message, role, level, companyType } = JSON.parse(storedMsg);
-            setMessages([{ id: "1", role: "interviewer", content: message, createdAt: new Date() }]);
-            setSessionMeta({ role, level, companyType });
-            sessionStorage.removeItem(`interview_${sessionId}`);
-          } else {
-            setError("Sessão não encontrada. Inicie uma nova entrevista.");
-          }
+          setIsGeminiActive(data.isGeminiActive ?? false);
+          // Timer a partir do início real da sessão
+          if (data.startedAt) startTimeRef.current = new Date(data.startedAt).getTime();
+        } else if (!storedMsg) {
+          setError("Sessão não encontrada. Inicie uma nova entrevista.");
         }
       } catch {
         setError("Erro ao carregar sessão.");
@@ -290,6 +294,9 @@ export default function InterviewPage() {
               <Clock className="w-3 h-3" />
               {formatTime(elapsedSeconds)}
             </Badge>
+            <Badge variant={isGeminiActive ? "success" : "outline"} className="text-xs hidden sm:flex">
+              {isGeminiActive ? "✦ Gemini ativo" : "⬡ Modo demo"}
+            </Badge>
           </div>
         </div>
       </header>
@@ -342,6 +349,7 @@ export default function InterviewPage() {
                 <textarea
                   ref={textareaRef}
                   value={answer}
+                  maxLength={4000}
                   onChange={(e) => {
                     setAnswer(e.target.value);
                     autoResize();

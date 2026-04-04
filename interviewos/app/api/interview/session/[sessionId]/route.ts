@@ -25,12 +25,18 @@ export async function GET(
     return NextResponse.json({ error: "Sessão não encontrada" }, { status: 404 });
   }
 
+  const isGeminiActive =
+    !!process.env.GEMINI_API_KEY &&
+    process.env.GEMINI_API_KEY !== "your-gemini-api-key";
+
   return NextResponse.json({
     id: interviewSession.id,
     role: interviewSession.role,
     level: interviewSession.level,
     companyType: interviewSession.companyType,
     status: interviewSession.status,
+    startedAt: interviewSession.startedAt,
     messages: interviewSession.messages,
+    isGeminiActive,
   });
 }
