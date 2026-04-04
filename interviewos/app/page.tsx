@@ -98,23 +98,23 @@ export default async function LandingPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-primary/20 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="container relative z-10 text-center max-w-4xl mx-auto">
-          <Badge variant="info" className="mb-6 text-xs px-3 py-1">
+          <Badge variant="info" className="mb-6 text-xs px-3 py-1 animate-fade-in-up">
             <Zap className="w-3 h-3 mr-1" />
             Powered by Google Gemini
           </Badge>
 
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 leading-tight animate-fade-in-up animate-delay-100">
             Simule entrevistas técnicas{" "}
             <span className="text-primary">reais</span> com IA
           </h1>
 
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in-up animate-delay-200">
             Pratique antes da entrevista que importa. Escolha a vaga, o nível e
             o estilo da empresa. Receba feedback detalhado e um plano de estudos
             personalizado — tudo com IA.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-16">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-16 animate-fade-in-up animate-delay-300">
             <Button size="lg" className="gap-2" asChild>
               <Link href={session ? "/setup" : "/login"}>
                 Fazer uma entrevista agora
@@ -134,7 +134,7 @@ export default async function LandingPage() {
           </div>
 
           {/* Mock terminal */}
-          <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur text-left overflow-hidden max-w-2xl mx-auto shadow-2xl">
+          <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur text-left overflow-hidden max-w-2xl mx-auto shadow-2xl animate-fade-in-up animate-delay-400">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 bg-muted/30">
               <div className="w-3 h-3 rounded-full bg-red-500/70" />
               <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
@@ -193,8 +193,8 @@ export default async function LandingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {features.map((feature) => (
-              <Card key={feature.title} className="border-border/50 bg-card/30 hover:bg-card/60 transition-colors">
+            {features.map((feature, i) => (
+              <Card key={feature.title} className={`border-border/50 bg-card/30 hover:bg-card/60 transition-colors animate-fade-in-up animate-delay-${(i + 1) * 100}`}>
                 <CardContent className="p-6 flex gap-4">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <feature.icon className="w-5 h-5 text-primary" />
@@ -219,8 +219,8 @@ export default async function LandingPage() {
           </div>
 
           <div className="flex flex-wrap gap-3 justify-center">
-            {roles.map((role) => (
-              <Card key={role.label} className="border-border/50 bg-card/30 hover:bg-card/80 transition-all hover:scale-105 cursor-default">
+            {roles.map((role, i) => (
+              <Card key={role.label} className={`border-border/50 bg-card/30 hover:bg-card/80 transition-all hover:scale-105 cursor-default animate-fade-in-up animate-delay-${(i + 1) * 100}`}>
                 <CardContent className="p-4 flex items-center gap-3">
                   <span className="text-2xl">{role.icon}</span>
                   <div>

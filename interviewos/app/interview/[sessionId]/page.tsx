@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Terminal, Send, Loader2, StopCircle, AlertCircle } from "lucide-react";
+import { Terminal, Send, Loader2, StopCircle, AlertCircle, Clock } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import Link from "next/link";
@@ -104,10 +104,26 @@ export default function InterviewPage() {
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false);
   const [error, setError] = useState("");
   const [questionCount, setQuestionCount] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const startTimeRef = useRef<number>(Date.now());
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  // Interview timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function formatTime(seconds: number) {
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  }
 
   useEffect(() => {
     scrollToBottom();
@@ -269,6 +285,10 @@ export default function InterviewPage() {
             )}
             <Badge variant="outline" className="text-xs">
               {questionCount} perguntas
+            </Badge>
+            <Badge variant="outline" className="text-xs gap-1 font-mono">
+              <Clock className="w-3 h-3" />
+              {formatTime(elapsedSeconds)}
             </Badge>
           </div>
         </div>

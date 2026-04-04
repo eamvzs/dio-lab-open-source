@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,9 @@ import {
   TrendingUp,
   Target,
   Lightbulb,
+  Share2,
+  Check,
+  RefreshCw,
 } from "lucide-react";
 import { FeedbackData } from "@/types";
 import { ROLE_LABELS, COMPANY_LABELS } from "@/lib/gemini";
@@ -29,24 +32,37 @@ const priorityColors: Record<string, string> = {
   baixa: "text-blue-400 bg-blue-500/10 border-blue-500/20",
 };
 
+interface SessionMeta {
+  role: string;
+  companyType: string;
+  level: string;
+}
+
 export default function FeedbackPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const router = useRouter();
   const [feedback, setFeedback] = useState<FeedbackData | null>(null);
-  const [sessionMeta, setSessionMeta] = useState<{ role: string; companyType: string } | null>(null);
+  const [sessionMeta, setSessionMeta] = useState<SessionMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [displayScore, setDisplayScore] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [isRepeating, setIsRepeating] = useState(false);
+  const animationRef = useRef<number | null>(null);
 
   useEffect(() => {
     const loadFeedback = async () => {
       try {
-        // First get session info
         const sessionRes = await fetch(`/api/interview/session/${sessionId}`);
         if (sessionRes.ok) {
           const sessionData = await sessionRes.json();
-          setSessionMeta({ role: sessionData.role, companyType: sessionData.companyType });
+          setSessionMeta({
+            role: sessionData.role,
+            companyType: sessionData.companyType,
+            level: sessionData.level,
+          });
         }
 
-        // Then get/generate feedback
         const feedbackRes = await fetch("/api/interview/end", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -64,6 +80,82 @@ export default function FeedbackPage() {
     };
     loadFeedback();
   }, [sessionId]);
+
+  // Animated score counter
+  useEffect(() => {
+    if (!feedback) return;
+    const target = feedback.score;
+    const duration = 1200;
+    const startTime = Date.now();
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayScore(Math.round(eased * target));
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      animationRef.current = requestAnimationFrame(animate);
+    }, 400);
+
+    return () => {
+      clearTimeout(timeout);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [feedback]);
+
+  async function handleShare() {
+    if (!feedback || !sessionMeta) return;
+    const text =
+      `🎯 InterviewOS — Resultado da entrevista\n\n` +
+      `Vaga: ${ROLE_LABELS[sessionMeta.role]}\n` +
+      `Empresa: ${COMPANY_LABELS[sessionMeta.companyType]}\n` +
+      `Score: ${feedback.score}/100\n` +
+      `Veredicto: ${getVerdictLabel(feedback.verdict)}\n\n` +
+      `Pratique antes da entrevista que importa 👉 github.com/eamvzs/dio-lab-open-source`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // silently fail if clipboard not available
+    }
+  }
+
+  async function handleRepeat() {
+    if (!sessionMeta) return;
+    setIsRepeating(true);
+    try {
+      const res = await fetch("/api/interview/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: sessionMeta.role,
+          level: sessionMeta.level,
+          companyType: sessionMeta.companyType,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        sessionStorage.setItem(
+          `interview_${data.sessionId}`,
+          JSON.stringify({
+            message: data.message,
+            role: sessionMeta.role,
+            level: sessionMeta.level,
+            companyType: sessionMeta.companyType,
+          })
+        );
+        router.push(`/interview/${data.sessionId}`);
+      }
+    } catch {
+      setIsRepeating(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -101,9 +193,13 @@ export default function FeedbackPage() {
             </div>
             InterviewOS
           </Link>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={handleShare} className="gap-2">
+              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
+              {copied ? "Copiado!" : "Compartilhar"}
+            </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard">Histórico</Link>
+              <Link href="/dashboard">Métricas</Link>
             </Button>
             <Button size="sm" asChild>
               <Link href="/setup">Nova entrevista</Link>
@@ -114,16 +210,22 @@ export default function FeedbackPage() {
 
       <main className="container max-w-3xl py-10 space-y-8">
         {/* Score hero */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 animate-scale-in">
           <div className="inline-block">
-            <div className={cn("text-7xl font-extrabold", getScoreColor(feedback.score))}>
-              {feedback.score}
+            <div className={cn("text-7xl font-extrabold tabular-nums", getScoreColor(feedback.score))}>
+              {displayScore}
             </div>
             <div className="text-muted-foreground text-sm font-medium">/ 100 pontos</div>
           </div>
 
-          <div className={cn("inline-flex items-center gap-2 px-4 py-2 rounded-full border font-semibold", getVerdictColor(feedback.verdict), "border-current/20 bg-current/5")}>
-            {feedback.verdict === "aprovado" ? <CheckCircle2 className="w-4 h-4" /> : <Target className="w-4 h-4" />}
+          <div className={cn(
+            "inline-flex items-center gap-2 px-4 py-2 rounded-full border font-semibold",
+            getVerdictColor(feedback.verdict),
+            "border-current/20 bg-current/5"
+          )}>
+            {feedback.verdict === "aprovado"
+              ? <CheckCircle2 className="w-4 h-4" />
+              : <Target className="w-4 h-4" />}
             {getVerdictLabel(feedback.verdict)}
           </div>
 
@@ -138,7 +240,7 @@ export default function FeedbackPage() {
         </div>
 
         {/* Score bar */}
-        <Card className="border-border/50">
+        <Card className="border-border/50 animate-fade-in-up animate-delay-200">
           <CardContent className="p-6">
             <div className="flex justify-between text-sm mb-3">
               <span className="font-medium">Pontuação geral</span>
@@ -154,7 +256,7 @@ export default function FeedbackPage() {
         </Card>
 
         {/* Summary */}
-        <Card className="border-border/50">
+        <Card className="border-border/50 animate-fade-in-up animate-delay-300">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-primary" />
@@ -167,7 +269,7 @@ export default function FeedbackPage() {
         </Card>
 
         {/* Strengths */}
-        <Card className="border-border/50 border-green-500/20 bg-green-500/5">
+        <Card className="border-border/50 border-green-500/20 bg-green-500/5 animate-fade-in-up animate-delay-400">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-green-400">
               <CheckCircle2 className="w-4 h-4" />
@@ -188,7 +290,7 @@ export default function FeedbackPage() {
 
         {/* Improvements */}
         {feedback.improvements.length > 0 && (
-          <Card className="border-border/50 border-yellow-500/20 bg-yellow-500/5">
+          <Card className="border-border/50 border-yellow-500/20 bg-yellow-500/5 animate-fade-in-up animate-delay-500">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2 text-yellow-400">
                 <AlertTriangle className="w-4 h-4" />
@@ -212,7 +314,7 @@ export default function FeedbackPage() {
         )}
 
         {/* Study Plan */}
-        <Card className="border-border/50">
+        <Card className="border-border/50 animate-fade-in-up animate-delay-600">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-primary" />
@@ -245,10 +347,20 @@ export default function FeedbackPage() {
         </Card>
 
         {/* CTA */}
-        <div className="flex gap-3 justify-center pb-8">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pb-8 animate-fade-in-up animate-delay-700">
           <Button variant="outline" asChild>
             <Link href="/dashboard">Ver histórico</Link>
           </Button>
+          {sessionMeta && (
+            <Button variant="outline" className="gap-2" onClick={handleRepeat} disabled={isRepeating}>
+              {isRepeating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              Repetir mesma configuração
+            </Button>
+          )}
           <Button asChild className="gap-2">
             <Link href="/setup">
               Praticar novamente
