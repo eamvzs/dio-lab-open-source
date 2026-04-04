@@ -40,12 +40,17 @@ export async function POST(req: NextRequest) {
   if (isDemo) {
     firstMessage = getMockOpener(role);
   } else {
-    const systemPrompt = buildInterviewSystemPrompt(role, level, companyType);
-    const chat = geminiModel.startChat({ history: [], systemInstruction: systemPrompt });
-    const result = await chat.sendMessage(
-      "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento."
-    );
-    firstMessage = result.response.text();
+    try {
+      const systemPrompt = buildInterviewSystemPrompt(role, level, companyType);
+      const chat = geminiModel.startChat({ history: [], systemInstruction: systemPrompt });
+      const result = await chat.sendMessage(
+        "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento."
+      );
+      firstMessage = result.response.text();
+    } catch (err) {
+      console.error("[Gemini] Erro na rota start:", err);
+      firstMessage = getMockOpener(role);
+    }
   }
 
   await prisma.message.create({

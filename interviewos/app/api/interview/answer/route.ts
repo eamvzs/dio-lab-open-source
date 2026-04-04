@@ -58,38 +58,47 @@ export async function POST(req: NextRequest) {
     interviewerResponse = result.message;
     isEnding = result.isEnding;
   } else {
-    const systemPrompt = buildInterviewSystemPrompt(
-      interviewSession.role,
-      interviewSession.level,
-      interviewSession.companyType
-    );
+    try {
+      const systemPrompt = buildInterviewSystemPrompt(
+        interviewSession.role,
+        interviewSession.level,
+        interviewSession.companyType
+      );
 
-    const history = interviewSession.messages.map((msg) => ({
-      role: msg.role === "interviewer" ? ("model" as const) : ("user" as const),
-      parts: [{ text: msg.content }],
-    }));
+      const history = interviewSession.messages.map((msg) => ({
+        role: msg.role === "interviewer" ? ("model" as const) : ("user" as const),
+        parts: [{ text: msg.content }],
+      }));
 
-    const fullHistory = [
-      {
-        role: "user" as const,
-        parts: [{ text: "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento." }],
-      },
-      ...history,
-    ];
+      const fullHistory = [
+        {
+          role: "user" as const,
+          parts: [{ text: "Inicie a entrevista com uma apresentação breve e a primeira pergunta de aquecimento." }],
+        },
+        ...history,
+      ];
 
-    const chat = geminiModel.startChat({
-      history: fullHistory.slice(0, -1),
-      systemInstruction: systemPrompt,
-    });
+      const chat = geminiModel.startChat({
+        history: fullHistory.slice(0, -1),
+        systemInstruction: systemPrompt,
+      });
 
-    const result = await chat.sendMessage(sanitizedAnswer);
-    interviewerResponse = result.response.text();
+      const result = await chat.sendMessage(sanitizedAnswer);
+      interviewerResponse = result.response.text();
 
-    const endingSignals = [
-      "encerramos", "encerrar a entrevista", "feedback estará disponível",
-      "obrigado pela sua participação", "boa sorte", "foi um prazer", "até logo",
-    ];
-    isEnding = endingSignals.some((s) => interviewerResponse.toLowerCase().includes(s));
+      const endingSignals = [
+        "encerramos", "encerrar a entrevista", "feedback estará disponível",
+        "obrigado pela sua participação", "boa sorte", "foi um prazer", "até logo",
+      ];
+      isEnding = endingSignals.some((s) => interviewerResponse.toLowerCase().includes(s));
+    } catch (err) {
+      console.error("[Gemini] Erro na rota answer:", err);
+      const questionCount =
+        interviewSession.messages.filter((m) => m.role === "interviewer").length - 1;
+      const fallback = getMockNextQuestion(interviewSession.role, questionCount, sanitizedAnswer);
+      interviewerResponse = fallback.message;
+      isEnding = fallback.isEnding;
+    }
   }
 
   await prisma.message.create({

@@ -70,24 +70,25 @@ export async function POST(req: NextRequest) {
   if (isDemo) {
     feedback = getMockFeedback(interviewSession.role);
   } else {
-    const feedbackPrompt = buildFeedbackPrompt(
-      interviewSession.role,
-      interviewSession.level,
-      interviewSession.companyType,
-      interviewSession.messages.map((m) => ({ role: m.role, content: m.content }))
-    );
-
-    const result = await geminiModel.generateContent(feedbackPrompt);
-    const feedbackText = result.response
-      .text()
-      .replace(/```json\n?/g, "")
-      .replace(/```\n?/g, "")
-      .trim();
-
     try {
+      const feedbackPrompt = buildFeedbackPrompt(
+        interviewSession.role,
+        interviewSession.level,
+        interviewSession.companyType,
+        interviewSession.messages.map((m) => ({ role: m.role, content: m.content }))
+      );
+
+      const result = await geminiModel.generateContent(feedbackPrompt);
+      const feedbackText = result.response
+        .text()
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+
       const parsed = JSON.parse(feedbackText);
       feedback = isValidFeedback(parsed) ? parsed : getMockFeedback(interviewSession.role, 60);
-    } catch {
+    } catch (err) {
+      console.error("[Gemini] Erro na rota end:", err);
       feedback = getMockFeedback(interviewSession.role, 60);
     }
   }
