@@ -4,12 +4,6 @@ Simulador de entrevistas técnicas com IA para desenvolvedores júniors.
 
 Pratique antes da entrevista que importa — escolha a vaga, o nível e o estilo da empresa. A IA conduz a entrevista, avalia suas respostas e entrega feedback detalhado com plano de estudos personalizado.
 
-## Demo
-
-> Deploy: [interviewos.vercel.app](https://interviewos.vercel.app) _(configure após deploy)_
-
-![InterviewOS Preview](./docs/preview.png)
-
 ## Funcionalidades
 
 - **5 vagas simuladas**: Frontend JR, Backend JR, Full Stack JR, Dados JR, Mobile JR
@@ -35,37 +29,43 @@ Pratique antes da entrevista que importa — escolha a vaga, o nível e o estilo
 
 ## Como rodar localmente
 
+> **Modo demo ativo por padrão** — funciona 100% sem GitHub OAuth nem chave Gemini.
+
 ### 1. Clone e instale as dependências
 
 ```bash
 git clone https://github.com/seu-usuario/interviewos.git
-cd interviewos
+cd interviewos/interviewos
 npm install
 ```
 
 ### 2. Configure as variáveis de ambiente
 
+Crie o arquivo `.env` (no Windows PowerShell):
+
+```powershell
+@"
+DATABASE_URL="file:./dev.db"
+DIRECT_URL="file:./dev.db"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="FRcGN6cWDrgeltAH7ZIsHRDXu5deUJAyGtv4Zw/LXvc="
+GITHUB_CLIENT_ID="your-github-client-id"
+GITHUB_CLIENT_SECRET="your-github-client-secret"
+GEMINI_API_KEY="your-gemini-api-key"
+"@ | Out-File -FilePath .env -Encoding utf8
+```
+
+Ou no Linux/Mac:
 ```bash
 cp .env.example .env
 ```
 
-Preencha o `.env`:
+> GitHub OAuth e Gemini API são **opcionais** — sem eles o app roda em modo demo com IA simulada.
 
-```env
-DATABASE_URL="file:./dev.db"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="..."          # openssl rand -base64 32
-
-GITHUB_CLIENT_ID="..."         # github.com/settings/developers
-GITHUB_CLIENT_SECRET="..."
-
-GEMINI_API_KEY="..."           # aistudio.google.com/app/apikey
-```
-
-### 3. Configure o banco de dados
+### 3. Crie o banco de dados
 
 ```bash
-npm run db:push
+npm run setup:dev
 ```
 
 ### 4. Rode o projeto
@@ -78,12 +78,16 @@ Acesse [http://localhost:3000](http://localhost:3000)
 
 ## Deploy na Vercel
 
-1. Fork este repositório
-2. Importe na [Vercel](https://vercel.com)
-3. Configure as variáveis de ambiente no painel
-4. Mude `DATABASE_URL` para uma URL PostgreSQL (Neon, Supabase ou Railway — todos gratuitos)
-5. Mude `NEXTAUTH_URL` para a URL do seu deploy
-6. Deploy automático a cada push
+1. Importe o repositório em [vercel.com/new](https://vercel.com/new)
+2. Configure o **Root Directory** como `interviewos`
+3. Adicione as variáveis de ambiente no painel da Vercel:
+   - `DATABASE_URL` → URL PostgreSQL do [Neon](https://neon.tech) (gratuito)
+   - `DIRECT_URL` → mesma URL do Neon
+   - `NEXTAUTH_URL` → `https://seu-app.vercel.app`
+   - `NEXTAUTH_SECRET` → string segura (`openssl rand -base64 32`)
+   - `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` → [github.com/settings/developers](https://github.com/settings/developers)
+   - `GEMINI_API_KEY` → [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+4. Clique em Deploy — a partir daí, cada `git push` dispara deploy automático
 
 ## Estrutura do projeto
 
