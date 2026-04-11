@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd interviewos && npm run build",
+  "outputDirectory": "interviewos/.next",
+  "installCommand": "cd interviewos && npm install",
+  "devCommand": "cd interviewos && npm run dev"
+}

@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id               String             @id @default(cuid())
+  name             String?
+  email            String?            @unique
+  emailVerified    DateTime?
+  image            String?
+  createdAt        DateTime           @default(now())
+  accounts         Account[]
+  sessions         Session[]
+  interviewSessions InterviewSession[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model InterviewSession {
+  id          String    @id @default(cuid())
+  userId      String
+  role        String    // frontend-jr, backend-jr, fullstack-jr, data-jr, mobile-jr
+  level       String    // junior, junior-advanced
+  companyType String    // startup, enterprise, big-tech, fintech
+  language    String    @default("pt-BR") // pt-BR, en-US
+  status      String    @default("active") // active, completing, completed, abandoned
+  score       Int?      // 0-100
+  feedback    String?   // JSON string with detailed feedback
+  shareToken  String?   @unique // public share token
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+}
+
+model Message {
+  id        String           @id @default(cuid())
+  sessionId String
+  role      String           // "interviewer" | "candidate"
+  content   String
+  createdAt DateTime         @default(now())
+  session   InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
