@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Terminal, Send, Loader2, StopCircle, AlertCircle, Clock } from "lucide-react";
+import { Terminal, Send, Loader2, StopCircle, AlertCircle, Clock, Mic, MicOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeSanitize from "rehype-sanitize";
 import Link from "next/link";
@@ -106,6 +106,8 @@ export default function InterviewPage() {
   const [questionCount, setQuestionCount] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isGeminiActive, setIsGeminiActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const startTimeRef = useRef<number>(Date.now());
 
   const scrollToBottom = useCallback(() => {
@@ -223,6 +225,45 @@ export default function InterviewPage() {
       setError("Erro ao gerar feedback. Tente novamente.");
       setIsGeneratingFeedback(false);
     }
+  }
+
+  function toggleVoice() {
+    if (typeof window === "undefined") return;
+    const SR =
+      (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition })
+        .SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+
+    if (!SR) {
+      setError("Seu navegador não suporta reconhecimento de voz. Tente o Chrome.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SR();
+    recognition.lang = "pt-BR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = Array.from(event.results)
+        .map((r) => r[0].transcript)
+        .join("");
+      setAnswer(transcript);
+      setTimeout(autoResize, 0);
+    };
+
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -373,6 +414,23 @@ export default function InterviewPage() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Send className="w-4 h-4" />
+                  )}
+                </Button>
+                <Button
+                  size="icon"
+                  variant={isListening ? "default" : "outline"}
+                  onClick={toggleVoice}
+                  disabled={isSending}
+                  className={cn(
+                    "h-12 w-12 rounded-xl shrink-0",
+                    isListening && "bg-red-500 hover:bg-red-600 border-red-500"
+                  )}
+                  title={isListening ? "Parar gravação" : "Responder por voz"}
+                >
+                  {isListening ? (
+                    <MicOff className="w-4 h-4" />
+                  ) : (
+                    <Mic className="w-4 h-4" />
                   )}
                 </Button>
                 <Button

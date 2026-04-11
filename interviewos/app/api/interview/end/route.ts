@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { geminiModel, buildFeedbackPrompt } from "@/lib/gemini";
 import { getMockFeedback } from "@/lib/gemini-mock";
+import { rateLimit } from "@/lib/rate-limit";
 
 const isDemo =
   !process.env.GEMINI_API_KEY ||
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
+  // 20 gerações de feedback por hora por usuário
+  if (!rateLimit(`end:${session.user.id}`, 20, 60 * 60 * 1000).allowed) {
+    return NextResponse.json(
+      { error: "Muitas requisições. Aguarde antes de gerar novo feedback." },
+      { status: 429 }
+    );
+  }
+
   const { sessionId } = await req.json();
 
   if (!sessionId || typeof sessionId !== "string") {
@@ -65,30 +74,41 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let feedback: unknown;
+  let feedback: unknown = null;
 
   if (isDemo) {
     feedback = getMockFeedback(interviewSession.role);
   } else {
-    try {
-      const feedbackPrompt = buildFeedbackPrompt(
-        interviewSession.role,
-        interviewSession.level,
-        interviewSession.companyType,
-        interviewSession.messages.map((m) => ({ role: m.role, content: m.content }))
-      );
+    const lang = (interviewSession.language ?? "pt-BR") as "pt-BR" | "en-US";
+    const feedbackPrompt = buildFeedbackPrompt(
+      interviewSession.role,
+      interviewSession.level,
+      interviewSession.companyType,
+      interviewSession.messages.map((m) => ({ role: m.role, content: m.content })),
+      lang
+    );
 
-      const result = await geminiModel.generateContent(feedbackPrompt);
-      const feedbackText = result.response
-        .text()
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
+    for (let attempt = 0; attempt < 3 && !feedback; attempt++) {
+      try {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, attempt * 1500));
+        }
+        const result = await geminiModel.generateContent(feedbackPrompt);
+        const text = result.response
+          .text()
+          .replace(/```json\n?/g, "")
+          .replace(/```\n?/g, "")
+          .trim();
+        const parsed = JSON.parse(text);
+        if (isValidFeedback(parsed)) feedback = parsed;
+        else console.warn(`[Gemini] Tentativa ${attempt + 1}: JSON inválido, tentando novamente`);
+      } catch (err) {
+        console.error(`[Gemini] Tentativa ${attempt + 1} falhou:`, err);
+      }
+    }
 
-      const parsed = JSON.parse(feedbackText);
-      feedback = isValidFeedback(parsed) ? parsed : getMockFeedback(interviewSession.role, 60);
-    } catch (err) {
-      console.error("[Gemini] Erro na rota end:", err);
+    if (!feedback) {
+      console.warn("[Gemini] Todas as tentativas falharam, usando mock");
       feedback = getMockFeedback(interviewSession.role, 60);
     }
   }

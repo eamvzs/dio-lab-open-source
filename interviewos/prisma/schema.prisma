@@ -60,9 +60,11 @@ model InterviewSession {
   role        String    // frontend-jr, backend-jr, fullstack-jr, data-jr, mobile-jr
   level       String    // junior, junior-advanced
   companyType String    // startup, enterprise, big-tech, fintech
-  status      String    @default("active") // active, completed, abandoned
+  language    String    @default("pt-BR") // pt-BR, en-US
+  status      String    @default("active") // active, completing, completed, abandoned
   score       Int?      // 0-100
   feedback    String?   // JSON string with detailed feedback
+  shareToken  String?   @unique // public share token
   startedAt   DateTime  @default(now())
   endedAt     DateTime?
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)

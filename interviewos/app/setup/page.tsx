@@ -29,7 +29,22 @@ const companies = [
   { value: "fintech", label: "Fintech", icon: "💳", description: "Segurança, confiabilidade, atenção a detalhes" },
 ];
 
-type Step = "role" | "level" | "company";
+const languages = [
+  {
+    value: "pt-BR",
+    label: "Português",
+    flag: "🇧🇷",
+    description: "Entrevista conduzida em português brasileiro",
+  },
+  {
+    value: "en-US",
+    label: "English",
+    flag: "🇺🇸",
+    description: "Interview conducted in English — great for international roles",
+  },
+];
+
+type Step = "role" | "level" | "company" | "language";
 
 export default function SetupPage() {
   const router = useRouter();
@@ -37,9 +52,10 @@ export default function SetupPage() {
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedLevel, setSelectedLevel] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("pt-BR");
   const [isLoading, setIsLoading] = useState(false);
 
-  const steps: Step[] = ["role", "level", "company"];
+  const steps: Step[] = ["role", "level", "company", "language"];
   const currentStepIndex = steps.indexOf(step);
 
   async function handleStart() {
@@ -52,6 +68,7 @@ export default function SetupPage() {
           role: selectedRole,
           level: selectedLevel,
           companyType: selectedCompany,
+          language: selectedLanguage,
         }),
       });
 
@@ -69,7 +86,7 @@ export default function SetupPage() {
       if (message) {
         sessionStorage.setItem(
           `interview_${sessionId}`,
-          JSON.stringify({ message, role: selectedRole, level: selectedLevel, companyType: selectedCompany })
+          JSON.stringify({ message, role: selectedRole, level: selectedLevel, companyType: selectedCompany, language: selectedLanguage })
         );
       }
       router.push(`/interview/${sessionId}`);
@@ -119,7 +136,7 @@ export default function SetupPage() {
             </div>
           ))}
           <span className="ml-2 text-sm text-muted-foreground">
-            Passo {currentStepIndex + 1} de 3
+            Passo {currentStepIndex + 1} de 4
           </span>
         </div>
 
@@ -255,7 +272,58 @@ export default function SetupPage() {
               </Button>
               <Button
                 className="flex-1 gap-2"
-                disabled={!selectedCompany || isLoading}
+                disabled={!selectedCompany}
+                onClick={() => setStep("language")}
+                size="lg"
+              >
+                Próximo
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step: Language */}
+        {step === "language" && (
+          <div className="animate-fade-in">
+            <h1 className="text-2xl font-bold mb-2">Em qual idioma?</h1>
+            <p className="text-muted-foreground mb-6">
+              Praticar em inglês é ótimo para vagas internacionais e empresas com cultura global
+            </p>
+            <div className="grid gap-3">
+              {languages.map((lang) => (
+                <Card
+                  key={lang.value}
+                  className={cn(
+                    "cursor-pointer border-2 transition-all hover:border-primary/50",
+                    selectedLanguage === lang.value
+                      ? "border-primary bg-primary/5"
+                      : "border-border/50 bg-card/30"
+                  )}
+                  onClick={() => setSelectedLanguage(lang.value)}
+                >
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <span className="text-2xl">{lang.flag}</span>
+                    <div className="flex-1">
+                      <p className="font-medium">{lang.label}</p>
+                      <p className="text-sm text-muted-foreground">{lang.description}</p>
+                    </div>
+                    {selectedLanguage === lang.value && (
+                      <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                        <span className="text-primary-foreground text-xs">✓</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button variant="outline" onClick={() => setStep("company")} className="flex-1">
+                Voltar
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                disabled={isLoading}
                 onClick={handleStart}
                 size="lg"
               >

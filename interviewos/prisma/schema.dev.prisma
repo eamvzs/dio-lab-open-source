@@ -59,9 +59,11 @@ model InterviewSession {
   role        String
   level       String
   companyType String
+  language    String    @default("pt-BR")
   status      String    @default("active")
   score       Int?
   feedback    String?
+  shareToken  String?   @unique
   startedAt   DateTime  @default(now())
   endedAt     DateTime?
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)

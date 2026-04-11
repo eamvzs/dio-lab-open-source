@@ -21,6 +21,7 @@ import {
   Share2,
   Check,
   RefreshCw,
+  Download,
 } from "lucide-react";
 import { FeedbackData } from "@/types";
 import { ROLE_LABELS, COMPANY_LABELS } from "@/lib/gemini";
@@ -109,6 +110,8 @@ export default function FeedbackPage() {
   const [displayScore, setDisplayScore] = useState(0);
   const [copied, setCopied] = useState(false);
   const [isRepeating, setIsRepeating] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [isCopyingLink, setIsCopyingLink] = useState(false);
   const animationRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -169,6 +172,41 @@ export default function FeedbackPage() {
     };
   }, [feedback]);
 
+  async function handleDownloadTranscript() {
+    try {
+      const res = await fetch(`/api/interview/session/${sessionId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const roleLabel = sessionMeta ? ROLE_LABELS[sessionMeta.role] ?? sessionMeta.role : "—";
+      const companyLabel = sessionMeta ? COMPANY_LABELS[sessionMeta.companyType] ?? sessionMeta.companyType : "—";
+      const header = [
+        "InterviewOS — Transcrição da entrevista",
+        `Vaga: ${roleLabel}`,
+        `Empresa: ${companyLabel}`,
+        `Data: ${new Date().toLocaleDateString("pt-BR")}`,
+        feedback ? `Score: ${feedback.score}/100` : "",
+        "",
+        "=".repeat(50),
+        "",
+      ].join("\n");
+      const lines = (data.messages as Array<{ role: string; content: string }>)
+        .map(
+          (m) =>
+            `[${m.role === "interviewer" ? "Entrevistador" : "Você"}]\n${m.content}`
+        )
+        .join("\n\n---\n\n");
+      const blob = new Blob([header + lines], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `entrevista-${(sessionId as string).slice(0, 8)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently fail
+    }
+  }
+
   async function handleShare() {
     if (!feedback || !sessionMeta) return;
     const text =
@@ -184,6 +222,31 @@ export default function FeedbackPage() {
       setTimeout(() => setCopied(false), 2500);
     } catch {
       // silently fail if clipboard not available
+    }
+  }
+
+  async function handleCopyPublicLink() {
+    setIsCopyingLink(true);
+    try {
+      let link = shareLink;
+      if (!link) {
+        const res = await fetch("/api/share", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+        if (!res.ok) throw new Error("Erro ao gerar link");
+        const data = await res.json();
+        link = `${window.location.origin}${data.shareUrl}`;
+        setShareLink(link);
+      }
+      await navigator.clipboard.writeText(link!);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // silently fail
+    } finally {
+      setIsCopyingLink(false);
     }
   }
 
@@ -256,9 +319,21 @@ export default function FeedbackPage() {
             InterviewOS
           </Link>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={handleShare} className="gap-2">
-              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Share2 className="w-4 h-4" />}
-              {copied ? "Copiado!" : "Compartilhar"}
+            <Button variant="ghost" size="sm" onClick={handleDownloadTranscript} className="gap-2">
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Transcrição</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleCopyPublicLink} disabled={isCopyingLink} className="gap-2">
+              {isCopyingLink ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : copied && shareLink ? (
+                <Check className="w-4 h-4 text-green-400" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {copied && shareLink ? "Link copiado!" : "Link público"}
+              </span>
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard">Métricas</Link>

@@ -22,6 +22,7 @@ import {
 import { DashboardStats } from "@/types";
 import { ROLE_LABELS, COMPANY_LABELS, LEVEL_LABELS } from "@/lib/gemini";
 import { cn, formatDate, getScoreColor, getScoreBg } from "@/lib/utils";
+import { OnboardingModal } from "@/components/onboarding-modal";
 
 interface SessionSummary {
   id: string;
@@ -222,6 +223,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <OnboardingModal />
       <header className="border-b border-border/40">
         <div className="container flex h-14 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-bold">
